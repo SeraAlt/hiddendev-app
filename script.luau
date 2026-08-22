@@ -1,86 +1,86 @@
 --Discord User: serataken
 --Roblox User: Seraphynxx
 
-local Player = game.Players.LocalPlayer
-local Character = Player.Character or Player.CharacterAdded:Wait()
-local HRP = Character:WaitForChild("HumanoidRootPart")
-local Humanoid:Humanoid = Character.Humanoid 
-local Animator:Animator = Humanoid.Animator
-local Camera = workspace.CurrentCamera
-local MainGui = Player.PlayerGui.MainGui
-local Mouse = Player:GetMouse()
-
-local UIS = game:GetService("UserInputService")
-local RS = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 
-local Anims = ReplicatedStorage.Default --Animation Folder
-local VFX = ReplicatedStorage.VFX
-local TrailVFX = ReplicatedStorage.VFX.Default --Flight trails
+local player:Player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local HRP = character:WaitForChild("HumanoidRootPart")
+local humanoid:Humanoid = character.Humanoid 
+local animator:Animator  = humanoid.Animator
 
-local TweeInfo = TweenInfo.new(0.5,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut,0,false,0)
+local camera = workspace.CurrentCamera
+local mouse = player:GetMouse()
 
-local CanBoost = true --check thats off whenever ur boosting so you cant stack boost with itself, nor ''fast fly''
+local mainGui = player.PlayerGui.MainGui
+local anims = ReplicatedStorage.Default --Animation Folder
+local VFX = ReplicatedStorage.VFX --vfx folder
+local trailVFX = ReplicatedStorage.VFX.Default --Flight trails
 
-local Att = Instance.new("Attachment")
-Att.Parent = HRP
+local tweenInfo = TweenInfo.new(0.5,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut,0,false,0)
 
-local AlignPos = Instance.new("AlignPosition") -- align position that will be used and reused for flight
+local canBoost = true --check for whether ur boosting or not
 
-AlignPos.Enabled = false --setting it to false as we arent using it right away
-AlignPos.Mode = Enum.PositionAlignmentMode.OneAttachment -- setting it to 1 attachment as two are unecessary
-AlignPos.MaxForce = math.huge --removes the speed cap
-AlignPos.Responsiveness = 50
+local alignAttachment = Instance.new("Attachment") --attachment for both alignPosition and alignOrientation
+alignAttachment.Parent = HRP
 
-AlignPos.Attachment0 = Att
-AlignPos.Parent = HRP 
+local alignPosition = Instance.new("AlignPosition") -- re-usable align position for flying
 
-local AlignOrientation = Instance.new("AlignOrientation")
+alignPosition.Enabled = false --setting it to false as we arent using it right away
+alignPosition.Mode = Enum.PositionAlignmentMode.OneAttachment -- setting it to 1 attachment as two are unecessary
+alignPosition.MaxForce = math.huge --makes sure the force cap doesnt get in the way
+alignPosition.Responsiveness = 50
 
-AlignOrientation.Enabled = false
-AlignOrientation.Mode = Enum.OrientationAlignmentMode.OneAttachment --  setting it to 1 attachment as two are unecessary
-AlignOrientation.MaxTorque = math.huge  --removes the torque cap
-AlignOrientation.Responsiveness = 50
+alignPosition.Attachment0 = alignAttachment
+alignPosition.Parent = HRP 
 
-AlignOrientation.Attachment0 = Att
-AlignOrientation.Parent = HRP
+local alignOrientation = Instance.new("AlignOrientation") --re-usasble align orientation thats only enabled when ur flying
+
+alignOrientation.Enabled = false -- setting it to false as we arent using it right away
+alignOrientation.Mode = Enum.OrientationAlignmentMode.OneAttachment --  setting it to 1 attachment as two are unecessary
+alignOrientation.MaxTorque = math.huge  --makes sure the torque cap doesnt get in the way
+alignOrientation.Responsiveness = 50
+
+alignOrientation.Attachment0 = alignAttachment
+alignOrientation.Parent = HRP
 
 
-
-local ActionTable = { -- a key, the direction associated with that key and the multiplier, followed by which anim to play
-	["W"] = {"LookVector", 2, Animator:LoadAnimation(Anims.WFly),},
-	["A"] = {"RightVector", -2, Animator:LoadAnimation(Anims.AFly),},
-	["S"] = {"LookVector", -2, Animator:LoadAnimation(Anims.SFly),},
-	["D"] = {"RightVector", 2, Animator:LoadAnimation(Anims.DFly),},
-	["Idle"] = {"RightVector", 0, Animator:LoadAnimation(Anims.FlightIdle),},
+local actionTable = { -- table used to know what direction to fly and animation to play based off the key ur holding, with idle being no key held
+	["W"] = {"LookVector", 2, animator:LoadAnimation(anims.WFly),},
+	["A"] = {"RightVector", -2, animator:LoadAnimation(anims.AFly),},
+	["S"] = {"LookVector", -2, animator:LoadAnimation(anims.SFly),},
+	["D"] = {"RightVector", 2, animator:LoadAnimation(anims.DFly),},
+	["Idle"] = {"RightVector", 0, animator:LoadAnimation(anims.FlightIdle),},
 } 
-for i, v in pairs(ActionTable) do --preloads all anims, doing this method since content provider only works on instances
+for i, v in pairs(actionTable) do --preloads all anims, doing this method since content provider only works on instances
 	v[3]:Play()
 
 	v[3]:Stop()
 end
 
-local CurrentDirection = "Idle" -- used across the script to know what anim and direction to use from the actionTable Dictionary
+local currentDirection = "Idle" -- changes depending on what key ur holding, used to determine what index to use in actionTable
 
-local LoopTable = {
+local LoopTable = { --used to know where to parent clones of trailVFX for when ur flying
 
-	Character:WaitForChild("LeftHand").LeftGripAttachment,
-	Character:WaitForChild("RightHand").RightGripAttachment,
-	Character:WaitForChild("LeftFoot").LeftFootAttachment,
-	Character:WaitForChild("RightFoot").RightFootAttachment,
-} -- table used to disable/enable trails inside the 4 attachments
+	character:WaitForChild("LeftHand").LeftGripAttachment,
+	character:WaitForChild("RightHand").RightGripAttachment,
+	character:WaitForChild("LeftFoot").LeftFootAttachment,
+	character:WaitForChild("RightFoot").RightFootAttachment,
+} 
 
-local ItemTable = { --table for all the consumables in the game with hover descriptions and effects
+local itemTable = { --stores consumable's names, descriptions, and a function
 	["Soder"] = {
 		["Description"] = "gain +15 flight speed for 5 secs",
 
 		["Activate"] = function()
 
-			Character:SetAttribute("Speed", Character:GetAttribute("Speed" ) + 15)
+			character:SetAttribute("Speed", character:GetAttribute("Speed" ) + 15)
 			task.delay(5,function()
-				Character:SetAttribute("Speed", Character:GetAttribute("Speed" ) - 15)
+				character:SetAttribute("Speed", character:GetAttribute("Speed" ) - 15)
 
 			end)
 		end,
@@ -92,7 +92,7 @@ local ItemTable = { --table for all the consumables in the game with hover descr
 
 		["Activate"] = function()
 
-			Character:SetAttribute("Flying", nil)
+			character:SetAttribute("Flying", nil)
 
 		end,
 
@@ -104,7 +104,7 @@ local ItemTable = { --table for all the consumables in the game with hover descr
 
 		["Activate"] = function()
 
-			Character:SetAttribute("Speed", Character:GetAttribute("Speed" ) + 1)
+			character:SetAttribute("Speed", character:GetAttribute("Speed" ) + 1)
 
 		end,
 
@@ -115,7 +115,7 @@ local ItemTable = { --table for all the consumables in the game with hover descr
 
 		["Activate"] = function()
 
-			Character:SetAttribute("Speed", Character:GetAttribute("Speed" ) - 1)
+			character:SetAttribute("Speed", character:GetAttribute("Speed" ) - 1)
 
 		end,
 
@@ -123,10 +123,10 @@ local ItemTable = { --table for all the consumables in the game with hover descr
 
 }
 
-Character:SetAttribute("Speed", 1) --used for speed multipliers, such as items
+character:SetAttribute("Speed", 1) --used for speed multipliers, better than changing alignPosition's responsiveness directly to avoid multiplicative modifiers
 
 
-local function PlaySound(Sound:Sound, Parent, Speed) --used for playing SFX 
+local function PlaySound(Sound:Sound, Parent, Speed) --vfx function, simply clones a vfx, parents it and plays it 
 	Sound = game.SoundService:WaitForChild(Sound):Clone()
 
 	Sound.Parent = Parent
@@ -136,34 +136,34 @@ local function PlaySound(Sound:Sound, Parent, Speed) --used for playing SFX
 	Debris:AddItem(Sound, Sound.TimeLength + 2)
 end
 
-UIS.InputBegan:Connect(function(input, GPE)
+UserInputService.InputBegan:Connect(function(input, GPE)
 
-	if GPE then return end 
+	if GPE then return end --makes sure u dont fly around while typing
 
-	if  ActionTable[input.KeyCode.Name] then CurrentDirection = input.KeyCode.Name  end  -- checks if the input is either W,A,S,D and sets the variable if it is
+	if  actionTable[input.KeyCode.Name] then currentDirection = input.KeyCode.Name  end  -- checks if the input is a valid direction (W,A,S,D) to avoid errors
 
-	if input.KeyCode == Enum.KeyCode.Space  and Humanoid:GetState() == Enum.HumanoidStateType.Freefall and CanBoost then --checks if character is airborne and pressing space
+	if input.KeyCode == Enum.KeyCode.Space  and humanoid:GetState() == Enum.HumanoidStateType.Freefall and canBoost then --makes sure u can only start flight if you jump while being airborne
 
-		Character:SetAttribute("Flying" , if Character:GetAttribute("Flying") then nil else true) -- sets flying to true if they arent flying, otherwise sets it to nil (setting to nil  instead of false so the attribute isnt shown and clutter/bloat the character attributes)
+		character:SetAttribute("Flying" , if character:GetAttribute("Flying") then nil else true) -- sets flight, nil is used instead of false to avoid attribute cluttering under character
 
 	end
 
-	if input.KeyCode == Enum.KeyCode.LeftControl then
+	if input.KeyCode == Enum.KeyCode.LeftControl then --makes you fly faster and doesnt work while boosting, also changes fov to give the illusion of speed
 
-		if  not Character:GetAttribute("Flying")  or not CanBoost then return end 
+		if  not character:GetAttribute("Flying")  or not canBoost then return end 
 
-		TweenService:Create(Camera,TweeInfo, {["FieldOfView"] = 90}):Play()
+		TweenService:Create(camera,tweenInfo, {["FieldOfView"] = 90}):Play()
 
-		Character:SetAttribute("Speed", Character:GetAttribute("Speed") + 1)
+		character:SetAttribute("Speed", character:GetAttribute("Speed") + 1)
 	end
 
-	if input.KeyCode == Enum.KeyCode.E and CanBoost and Character:GetAttribute("Flying") then
+	if input.KeyCode == Enum.KeyCode.E and canBoost and character:GetAttribute("Flying") then --givesd you a massive flight speed boost for 1 second, also changes fov,
 
-		CanBoost = false
+		canBoost = false --makes sure you cant stack boosts
 
-		Character:SetAttribute("Speed", Character:GetAttribute("Speed") + 10)
+		character:SetAttribute("Speed", character:GetAttribute("Speed") + 10)
 
-		TweenService:Create(Camera,TweeInfo, {["FieldOfView"] = 120}):Play()
+		TweenService:Create(camera,tweenInfo, {["FieldOfView"] = 120}):Play()
 
 		PlaySound("Boost", HRP)
 
@@ -177,50 +177,50 @@ UIS.InputBegan:Connect(function(input, GPE)
 			end
 		end
 
-		task.delay(1, function()
+		task.delay(1, function() --resets the speed boost and fov, and lets you boost again
 
-			Character:SetAttribute("Speed", Character:GetAttribute("Speed") - 10)
+			character:SetAttribute("Speed", character:GetAttribute("Speed") - 10)
 
-			TweenService:Create(Camera,TweeInfo, {["FieldOfView"] = 70}):Play()
+			TweenService:Create(camera,tweenInfo, {["FieldOfView"] = 70}):Play()
 
-			CanBoost = true
+			canBoost = true
 		end)
 	end
 end)
 
-UIS.InputEnded:Connect(function(input, GPE) --stops movement on release
+UserInputService.InputEnded:Connect(function(input, GPE) --stops movement on release
 
 	if  GPE then return end
 
-	if input.KeyCode.Name == CurrentDirection then --makes sure u only stop when no other key is being held
+	if input.KeyCode.Name == currentDirection then --makes sure you dont fully stop if ur holding a diff key (EX:. holding A then D, and then letting go of A would stop you even if your still holding D, this prevents that)
 
 
-		CurrentDirection = "Idle"
+		currentDirection = "Idle"
 
 	end
 
-	if input.KeyCode == Enum.KeyCode.LeftControl then
+	if input.KeyCode == Enum.KeyCode.LeftControl then --slows down your flight, doesnt work while boosting.
 
-		if  not Character:GetAttribute("Flying")  or not CanBoost then return end
+		if  not character:GetAttribute("Flying")  or not canBoost then return end 
 
-		TweenService:Create(Camera,TweeInfo, {["FieldOfView"] = 70}):Play()
-		Character:SetAttribute("Speed", Character:GetAttribute("Speed") - 1)
+		TweenService:Create(camera,tweenInfo, {["FieldOfView"] = 70}):Play()
+		character:SetAttribute("Speed", character:GetAttribute("Speed") - 1)
 
 	end
 end)
 
-Character:GetAttributeChangedSignal("Flying"):Connect(function() --enables align orientation and position whenever the flying attribute is true, disables otherwise, also disables auto rotation so turning around is handled by align orientation only
+character:GetAttributeChangedSignal("Flying"):Connect(function() --enables alignPosition and alignOrientation, and disables autorotate so rotation is handled by alignOrientation instead, does the opposite if flying attribute is false
 
-	if Character:GetAttribute("Flying") then
+	if character:GetAttribute("Flying") then
 
-		AlignOrientation.Enabled = true
-		AlignPos.Enabled = true
+		alignOrientation.Enabled = true
+		alignPosition.Enabled = true
 
-		Humanoid.AutoRotate = false --makes sure u cant rotate with shiftlock
+		humanoid.AutoRotate = false 
 
 
 		for i, v in pairs(LoopTable) do --enables trails
-			local Clone = TrailVFX:Clone()
+			local Clone = trailVFX:Clone()
 
 			Clone.Parent = v
 		end
@@ -228,14 +228,14 @@ Character:GetAttributeChangedSignal("Flying"):Connect(function() --enables align
 
 	else
 
-		AlignOrientation.Enabled = false
-		AlignPos.Enabled = false
+		alignOrientation.Enabled = false
+		alignPosition.Enabled = false
 
-		Humanoid.AutoRotate = true
+		humanoid.AutoRotate = true
 		
-		TweenService:Create(Camera,TweeInfo, {["FieldOfView"] = 70}):Play()-- makes sure the fov change from ''fast flying'' (aka holding control) isnt kept if u stop flying while doing it
+		TweenService:Create(camera,tweenInfo, {["FieldOfView"] = 70}):Play()-- gives the illusion of speed
 
-		for i, v in pairs(LoopTable) do --disables trails
+		for i, v in pairs(LoopTable) do --prevents trails from staying after you stop flying
 
 			if v:FindFirstChild("Default") then
 
@@ -245,21 +245,20 @@ Character:GetAttributeChangedSignal("Flying"):Connect(function() --enables align
 	end
 end)
 
-RS.Heartbeat:Connect(function()--runs every frame after physics
+RunService.Heartbeat:Connect(function()
 
-	if Character:GetAttribute("Flying") then
-
-
-		--moves the character using align pos, adds the CFrame of the HRP (HRP[LookVector or RightVector] * 1 or -1), look in ActionTable for reference
-		AlignPos.Position = (HRP.Position + (Camera.CFrame[ActionTable[CurrentDirection][1]] * (ActionTable[CurrentDirection][2])  * Character:GetAttribute("Speed"))) 
+	if character:GetAttribute("Flying") then --calculates in what direction to send alignPosition depending on what key ur holding, and how fast you should go based on the speed attribute.
 
 
+		alignPosition.Position = (HRP.Position + (camera.CFrame[actionTable[currentDirection][1]] * (actionTable[currentDirection][2])  * character:GetAttribute("Speed"))) 
 
-		AlignOrientation.CFrame = Camera.CFrame  -- updates the align orientation to face the same direction as the camera
 
-		for i, v in pairs(ActionTable) do --plays the anm for the current key, and stops the anims for all other keys to avoid overlapping
 
-			if i == CurrentDirection then
+		alignOrientation.CFrame = camera.CFrame  -- makes the character face the camera's direction
+
+		for i, v in pairs(actionTable) do --prevents anims from overlapping
+
+			if i == currentDirection then
 
 				if  v[3].IsPlaying then continue end
 
@@ -273,23 +272,24 @@ RS.Heartbeat:Connect(function()--runs every frame after physics
 
 	else
 
-		for i, v in pairs(ActionTable) do
+		for i, v in pairs(actionTable) do
 			v[3]:Stop()
-		end --stops all anims if you arent flying
+		end --stops all flying anims if you arent flying
 
 	end
 
-	local Target = Mouse.Target --gets the mouse target, used for the items
+	local target = mouse.Target 
 
-	if Target then --updates the hover text with the item description and makes it visible, or makes it not visible if you arent hovering over anything
-		if Target:FindFirstAncestor("items") then
-			MainGui.HoverLabel.Visible = true
-			MainGui.HoverLabel.Text = ItemTable[Target.Name].Description
+	if target then-- lets you read item description by hovering over it, also makes sure the gui is ontop of ur mouse
+		
+		if target:FindFirstAncestor("items") then
+			mainGui.HoverLabel.Visible = true
+			mainGui.HoverLabel.Text = itemTable[target.Name].Description
 
-			MainGui.HoverLabel.Position = UDim2.new(0, Mouse.X - 100 , 0, Mouse.Y - 50) --constantly updates the gui position to be ontop of ur mouse
+			mainGui.HoverLabel.Position = UDim2.new(0, mouse.X - 100 , 0, mouse.Y - 50) 
 
 		else
-			MainGui.HoverLabel.Visible = false
+			mainGui.HoverLabel.Visible = false
 		end
 	end
 
@@ -297,9 +297,9 @@ end)
 
 for i, v:Part in pairs(workspace.CheckPoints:GetChildren()) do 
 
-	v.Touched:Connect(function(Part) -- makes the touched checkpoint green, makes a noise then makes it red again after 20 secs
+	v.Touched:Connect(function(Part) -- ''activates'' a checkpoint when you touch it, then ''deactivates'' it after 20 seconds, ''activated'' checkpoints are turned green and play sfx, ''deactivated'' ones are red instead
 
-		if not Part:FindFirstAncestor("Live") or v:GetAttribute("Touched") then return end --checks if what touched it is acctualy a player and if it already has been touched before
+		if not Part:FindFirstAncestor("Live") or v:GetAttribute("Touched") then return end 
 
 		v:SetAttribute("Touched", true)
 
@@ -321,13 +321,13 @@ for i, v:Part in pairs(workspace.items:GetChildren()) do
 
 	local TouchFunction = nil
 
-	TouchFunction = v.Touched:Connect(function(Part)-- activates the item using the function inside the ItemTable Dictionary and disconnects the function, also destroys the item
+	TouchFunction = v.Touched:Connect(function(Part)-- activates the item using the function inside the itemTable Dictionary and disconnects the function, also destroys the item
 
 		TouchFunction:Disconnect() 
 		v:Destroy()
 
-		if ItemTable[v.Name] then
-			ItemTable[v.Name].Activate()
+		if itemTable[v.Name] then
+			itemTable[v.Name].Activate()
 		end
 	end)
 end
