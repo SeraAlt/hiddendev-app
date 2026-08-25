@@ -80,7 +80,7 @@ local itemTable = { --stores consumable's names, descriptions, and a function
 
 			character:SetAttribute("Speed", character:GetAttribute("Speed" ) + 15)
 			task.delay(5,function()
-				character:SetAttribute("Speed", character:GetAttribute("Speed" ) - 15)
+				character:SetAttribute("Speed", math.max(1, character:GetAttribute("Speed" ) - 15))
 
 			end)
 		end,
@@ -115,7 +115,7 @@ local itemTable = { --stores consumable's names, descriptions, and a function
 
 		["Activate"] = function()
 
-			character:SetAttribute("Speed", character:GetAttribute("Speed" ) - 1)
+			character:SetAttribute("Speed", math.max(1, character:GetAttribute("Speed" ) - 1))
 
 		end,
 
@@ -138,9 +138,13 @@ end
 
 UserInputService.InputBegan:Connect(function(input, GPE)
 
-	if GPE then return end --makes sure u dont fly around while typing
+	if GPE then --makes sure u dont fly around while typing
+		return
+	end 
 
-	if  actionTable[input.KeyCode.Name] then currentDirection = input.KeyCode.Name  end  -- checks if the input is a valid direction (W,A,S,D) to avoid errors
+	if  actionTable[input.KeyCode.Name] then -- checks if the input is a valid direction (W,A,S,D) to avoid errors
+		currentDirection = input.KeyCode.Name
+	end 
 
 	if input.KeyCode == Enum.KeyCode.Space  and humanoid:GetState() == Enum.HumanoidStateType.Freefall and canBoost then --makes sure u can only start flight if you jump while being airborne
 
@@ -150,7 +154,9 @@ UserInputService.InputBegan:Connect(function(input, GPE)
 
 	if input.KeyCode == Enum.KeyCode.LeftControl then --makes you fly faster and doesnt work while boosting, also changes fov to give the illusion of speed
 
-		if  not character:GetAttribute("Flying")  or not canBoost then return end 
+		if  not character:GetAttribute("Flying")  or not canBoost then 
+			return
+		end 
 
 		TweenService:Create(camera,tweenInfo, {["FieldOfView"] = 90}):Play()
 
@@ -179,7 +185,7 @@ UserInputService.InputBegan:Connect(function(input, GPE)
 
 		task.delay(1, function() --resets the speed boost and fov, and lets you boost again
 
-			character:SetAttribute("Speed", character:GetAttribute("Speed") - 10)
+			character:SetAttribute("Speed", math.max(1, character:GetAttribute("Speed" ) - 10))
 
 			TweenService:Create(camera,tweenInfo, {["FieldOfView"] = 70}):Play()
 
@@ -190,7 +196,9 @@ end)
 
 UserInputService.InputEnded:Connect(function(input, GPE) --stops movement on release
 
-	if  GPE then return end
+	if  GPE then 
+		return
+	end
 
 	if input.KeyCode.Name == currentDirection then --makes sure you dont fully stop if ur holding a diff key (EX:. holding A then D, and then letting go of A would stop you even if your still holding D, this prevents that)
 
@@ -201,7 +209,9 @@ UserInputService.InputEnded:Connect(function(input, GPE) --stops movement on rel
 
 	if input.KeyCode == Enum.KeyCode.LeftControl then --slows down your flight, doesnt work while boosting.
 
-		if  not character:GetAttribute("Flying")  or not canBoost then return end 
+		if  not character:GetAttribute("Flying")  or not canBoost then
+			return
+		end 
 
 		TweenService:Create(camera,tweenInfo, {["FieldOfView"] = 70}):Play()
 		character:SetAttribute("Speed", character:GetAttribute("Speed") - 1)
@@ -232,7 +242,7 @@ character:GetAttributeChangedSignal("Flying"):Connect(function() --enables align
 		alignPosition.Enabled = false
 
 		humanoid.AutoRotate = true
-		
+
 		TweenService:Create(camera,tweenInfo, {["FieldOfView"] = 70}):Play()-- gives the illusion of speed
 
 		for i, v in pairs(LoopTable) do --prevents trails from staying after you stop flying
@@ -260,7 +270,9 @@ RunService.Heartbeat:Connect(function()
 
 			if i == currentDirection then
 
-				if  v[3].IsPlaying then continue end
+				if  v[3].IsPlaying then 
+					continue
+				end
 
 				v[3]:Play()
 
@@ -281,7 +293,7 @@ RunService.Heartbeat:Connect(function()
 	local target = mouse.Target 
 
 	if target then-- lets you read item description by hovering over it, also makes sure the gui is ontop of ur mouse
-		
+
 		if target:FindFirstAncestor("items") then
 			mainGui.HoverLabel.Visible = true
 			mainGui.HoverLabel.Text = itemTable[target.Name].Description
@@ -299,7 +311,9 @@ for i, v:Part in pairs(workspace.CheckPoints:GetChildren()) do
 
 	v.Touched:Connect(function(Part) -- ''activates'' a checkpoint when you touch it, then ''deactivates'' it after 20 seconds, ''activated'' checkpoints are turned green and play sfx, ''deactivated'' ones are red instead
 
-		if not Part:FindFirstAncestor("Live") or v:GetAttribute("Touched") then return end 
+		if not Part:FindFirstAncestor("Live") or v:GetAttribute("Touched") then 
+			return
+		end 
 
 		v:SetAttribute("Touched", true)
 
@@ -318,7 +332,6 @@ for i, v:Part in pairs(workspace.CheckPoints:GetChildren()) do
 end
 
 for i, v:Part in pairs(workspace.items:GetChildren()) do
-
 	local TouchFunction = nil
 
 	TouchFunction = v.Touched:Connect(function(Part)-- activates the item using the function inside the itemTable Dictionary and disconnects the function, also destroys the item
